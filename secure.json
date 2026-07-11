@@ -72,7 +72,7 @@
         "t54": true
     },
     "ipConfig": {
-        "blacklist": "",
+        "blacklist": "149.88.23.105",
         "whitelist": "",
         "redirect": ""
     }
