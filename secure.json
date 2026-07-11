@@ -69,7 +69,7 @@
         "t31_countries": "",
         "t40_key": "",
         "t45_max": "",
-        "t54": false
+        "t54": true
     },
     "ipConfig": {
         "blacklist": "",
