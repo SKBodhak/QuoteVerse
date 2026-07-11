@@ -63,7 +63,12 @@
         "t50": false,
         "t51": true,
         "t52": true,
-        "t53": true
+        "t53": true,
+        "t10_url": "",
+        "t27_key": "",
+        "t31_countries": "",
+        "t40_key": "",
+        "t45_max": ""
     },
     "ipConfig": {
         "blacklist": "",
