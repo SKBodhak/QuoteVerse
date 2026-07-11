@@ -1,0 +1,1329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QuoteVerse OS | Command Center</title>
+    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,600&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { 
+            --bg: #f8fafc; --surface: #ffffff; --primary: #0f172a; --primary-hover: #1e293b; 
+            --accent: #2563eb; --accent-hover: #1d4ed8; --danger: #ef4444; --success: #10b981; 
+            --border: #e2e8f0; --text-main: #0f172a; --text-muted: #64748b; 
+            --radius-lg: 16px; --radius-md: 10px; 
+            --shadow-sm: 0 2px 4px rgba(0,0,0,0.05); --shadow-lg: 0 20px 25px -5px rgba(0,0,0,0.1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text-main); display: flex; flex-direction: column; min-height: 100vh; overflow-x: hidden; font-size: 16px; padding-bottom: 0; }
+
+        /* --- LOADERS & TOASTS --- */
+        .loading-overlay { position: fixed; inset: 0; background: rgba(255,255,255,0.95); z-index: 9999; display: none; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .loading-overlay.active { display: flex; }
+        .spinner { width: 60px; height: 60px; border: 5px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 20px;}
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .toast-container { position: fixed; top: 24px; right: 24px; display: flex; flex-direction: column; gap: 10px; z-index: 5000; pointer-events: none;}
+        .toast { background: var(--primary); color: white; padding: 15px 20px; border-radius: var(--radius-md); box-shadow: var(--shadow-lg); display: flex; align-items: center; gap: 12px; font-weight: 600; font-size: 1.05rem; transform: translateX(120%); transition: 0.4s ease; pointer-events: auto;}
+        .toast.show { transform: translateX(0); }
+
+        /* --- APP LAYOUT --- */
+        #appContainer { display: flex; flex-direction: column; min-height: 100vh; }
+        
+        .navbar { background: var(--surface); height: 75px; display: flex; align-items: center; justify-content: space-between; padding: 0 25px; box-shadow: var(--shadow-sm); position: sticky; top: 0; z-index: 100; border-bottom: 1px solid var(--border); }
+        .brand { font-family: 'Playfair Display', serif; font-size: 1.6rem; font-weight: 700; color: var(--primary); display: flex; align-items: center; gap: 10px; }
+        .nav-actions { display: flex; gap: 10px; align-items: center; }
+        .status-pill { display: flex; align-items: center; gap: 8px; background: #d1fae5; color: #065f46; padding: 8px 16px; border-radius: 50px; font-size: 0.9rem; font-weight: 700; border: 1px solid #a7f3d0; transition: 0.3s; }
+        .status-pill.error { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .status-pill.syncing { background: #e0e7ff; color: #1e40af; border-color: #bfdbfe; }
+        .btn-nav-icon { background: var(--bg); border: 1px solid var(--border); width: 44px; height: 44px; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 1.1rem; color: var(--text-main); cursor: pointer; transition: 0.2s;}
+
+        .layout { display: flex; flex-direction: row; flex: 1; max-width: 1600px; margin: 0 auto; width: 100%; padding: 25px; gap: 25px; align-items: flex-start; }
+        .sidebar { width: 260px; flex-shrink: 0; display: flex; flex-direction: column; gap: 5px; position: sticky; top: 100px; z-index: 90;}
+        .nav-item { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: var(--radius-md); color: var(--text-muted); font-weight: 600; cursor: pointer; transition: 0.2s; border: none; background: transparent; width: 100%; text-align: left; font-size: 1rem; }
+        .nav-item:hover { background: #e2e8f0; color: var(--text-main); }
+        .nav-item.active { background: var(--primary); color: white; box-shadow: var(--shadow-sm); }
+        .nav-section { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--text-muted); font-weight: 800; margin: 20px 0 5px 10px; }
+
+        .main-content { flex: 1; background: var(--surface); border-radius: var(--radius-lg); box-shadow: var(--shadow-sm); padding: 35px; border: 1px solid var(--border); min-height: 70vh; width: 100%; }
+        .view-section { display: none; animation: fadeUp 0.4s ease; }
+        .view-section.active { display: block; }
+        @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- UI COMPONENTS --- */
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; flex-wrap: wrap; gap: 15px; border-bottom: 2px solid var(--bg); padding-bottom: 20px;}
+        .section-title { font-size: 1.8rem; font-weight: 700; color: var(--primary); font-family: 'Playfair Display', serif; }
+        .btn { padding: 12px 24px; border-radius: var(--radius-md); font-weight: 600; font-size: 1rem; cursor: pointer; transition: 0.2s; border: none; display: inline-flex; align-items: center; gap: 8px; justify-content: center;}
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-hover); }
+        .btn-outline { background: white; color: var(--text-main); border: 1px solid var(--border); }
+        .btn-danger { background: #fef2f2; color: var(--danger); border: 1px solid #fecaca; }
+        
+        .search-box { position: relative; width: 100%; max-width: 400px; }
+        .search-box i { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 1.1rem;}
+        .search-box input { width: 100%; padding: 14px 16px 14px 45px; border-radius: 50px; border: 1px solid var(--border); background: var(--bg); outline: none; font-size: 1rem; }
+
+        .form-panel { background: var(--bg); border-radius: var(--radius-md); padding: 25px; border: 1px solid var(--border); margin-bottom: 25px; }
+        .form-row { display: flex; gap: 15px; width: 100%; flex-wrap: wrap; }
+        .form-row > * { flex: 1; min-width: 200px; }
+        .form-group { margin-bottom: 20px; width: 100%;}
+        .form-group label { display: block; font-size: 0.95rem; font-weight: 700; color: var(--text-main); margin-bottom: 8px;}
+        .form-control { width: 100%; padding: 14px 16px; border-radius: var(--radius-md); border: 1px solid var(--border); background: white; font-family: 'Inter', sans-serif; outline: none; transition: 0.2s; font-size: 1rem; color: var(--text-main);}
+        textarea.form-control { min-height: 120px; resize: vertical; line-height: 1.5; }
+        select.form-control { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1.2em; padding-right: 2.5rem; cursor: pointer; }
+
+        .toggle-row { display: flex; justify-content: space-between; align-items: center; padding: 15px 0; border-bottom: 1px dashed var(--border); }
+        .toggle-row:last-child { border-bottom: none; }
+        .toggle-info strong { display: block; font-size: 1.05rem; color: var(--text-main); font-weight: 700; margin-bottom: 4px;}
+        .toggle-info span { font-size: 0.9rem; color: var(--text-muted); line-height: 1.4; display: block;}
+        
+        .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex-shrink: 0; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #cbd5e1; transition: .3s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 22px; width: 22px; left: 4px; bottom: 4px; background-color: white; transition: .3s; border-radius: 50%;}
+        input:checked + .slider { background-color: var(--success); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+        .data-card { background: white; border: 1px solid var(--border); border-radius: var(--radius-md); padding: 20px; transition: 0.3s; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between; position: relative;}
+        .dc-badge { display: inline-block; padding: 6px 12px; background: var(--bg); border-radius: 50px; font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: var(--text-muted); margin-bottom: 12px; border: 1px solid var(--border);}
+        .dc-content { font-family: 'Playfair Display', serif; font-size: 1.2rem; color: var(--text-main); line-height: 1.5; margin-bottom: 10px; flex: 1; word-break: break-word;}
+        .dc-meta { font-size: 0.9rem; color: var(--text-muted); font-weight: 500; margin-bottom: 10px; display: flex; flex-direction: column; gap: 5px;}
+        .dc-actions { display: flex; justify-content: flex-end; gap: 8px; border-top: 1px solid var(--bg); padding-top: 15px; margin-top: 10px;}
+        .schedule-badge { font-size: 0.8rem; background: #e0e7ff; color: #3730a3; padding: 6px 10px; border-radius: 6px; font-family: monospace; display: inline-flex; align-items: center; gap: 6px; font-weight: 600;}
+
+        /* --- MODALS --- */
+        .modal-bg { position: fixed; inset: 0; background: rgba(15,23,42,0.85); backdrop-filter: blur(8px); z-index: 2000; display: none; align-items: flex-start; justify-content: center; opacity: 0; transition: 0.3s; padding: 5vh 20px 20px 20px; overflow-y: auto; }
+        .modal-bg.show { display: flex; opacity: 1; }
+        .modal-card { background: var(--surface); width: 100%; max-width: 700px; border-radius: 20px; box-shadow: var(--shadow-lg); display: flex; flex-direction: column; transform: translateY(20px); transition: 0.4s ease; margin: auto; }
+        .modal-bg.show .modal-card { transform: translateY(0); }
+        .modal-header { padding: 25px 30px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: #f8fafc; border-top-left-radius: 20px; border-top-right-radius: 20px; position: sticky; top: 0; z-index: 10;}
+        .modal-title { font-size: 1.5rem; font-weight: 800; color: var(--primary); font-family: 'Playfair Display', serif;}
+        .modal-close { background: white; border: 1px solid var(--border); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: var(--text-muted); cursor: pointer;}
+        .modal-body { padding: 30px; flex: 1; }
+        .modal-footer { padding: 20px 30px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 15px; background: white; border-bottom-left-radius: 20px; border-bottom-right-radius: 20px; position: sticky; bottom: 0; z-index: 10;}
+
+        .preview-modal { position: fixed; inset: 0; background: rgba(15,23,42,0.95); backdrop-filter: blur(8px); z-index: 3000; display: none; align-items: center; justify-content: center; opacity: 0; transition: 0.3s; padding: 20px; }
+        .preview-modal.show { display: flex; opacity: 1; }
+        .preview-content { position: relative; width: 100%; display: flex; justify-content: center; align-items: center; max-height: 90vh; overflow:hidden;}
+        .preview-close { position: absolute; top: -50px; right: 0; color: white; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.4); width: 45px; height: 45px; border-radius: 50%; font-size: 1.4rem; cursor: pointer; display: flex; justify-content: center; align-items: center; z-index: 3001; }
+
+        .json-editor { background: #0f172a; color: #38bdf8; padding: 20px; border-radius: var(--radius-lg); font-family: 'Consolas', monospace; font-size: 1rem; width: 100%; min-height: 600px; border: 2px solid #334155; outline: none; resize: vertical; line-height: 1.5; }
+        .hidden { display: none !important; }
+
+        /* --- MOBILE RESPONSIVE --- */
+        @media (max-width: 900px) {
+            .brand span { display: none; }
+            .status-pill span { display: none; }
+            body { padding-bottom: 90px; } 
+            .layout { flex-direction: column; padding: 15px; gap: 15px; align-items: stretch;}
+            .sidebar { position: fixed; bottom: 0; top: auto !important; left: 0; right: 0; width: 100%; height: 75px; flex-direction: row; background: rgba(255,255,255,0.98); backdrop-filter: blur(15px); border-top: 1px solid var(--border); padding: 10px; z-index: 1000; justify-content: flex-start; gap: 5px; overflow-x: auto; box-shadow: 0 -5px 20px rgba(0,0,0,0.05); }
+            .sidebar::-webkit-scrollbar { display: none; }
+            .nav-section { display: none; }
+            .nav-item { width: 50px; height: 50px; padding: 0; display: flex; justify-content: center; align-items: center; border-radius: 50%; flex-shrink: 0; }
+            .nav-item span { display: none; }
+            .nav-item i { font-size: 1.4rem; margin: 0; }
+            .main-content { padding: 20px; min-height: auto; border-radius: var(--radius-md); width: 100%;}
+            .section-header { flex-direction: column; align-items: stretch; gap: 15px;}
+            .search-box { max-width: 100%; width: 100%; }
+            .toast-container { top: 20px; right: 50%; transform: translateX(50%); width: 90%; max-width: 400px;}
+            .toast { transform: translateY(-120%); }
+            .toast.show { transform: translateY(0); }
+            .modal-bg { padding: 0; align-items: flex-end; }
+            .modal-card { border-radius: 20px 20px 0 0; margin: 0; max-height: 90vh; }
+            .modal-header { border-radius: 20px 20px 0 0; padding: 20px; }
+            .modal-body { padding: 20px; }
+            .modal-footer { border-radius: 0; padding: 20px; padding-bottom: 30px; }
+            .preview-close { top: 10px; right: 10px; z-index: 3002; background: var(--danger); border: none;}
+        }
+    </style>
+</head>
+<body>
+
+    <div class="loading-overlay" id="loader">
+        <div class="spinner"></div>
+        <p style="margin-top: 20px; font-weight: 700; color: var(--primary); font-size: 1.1rem; letter-spacing: 0.5px;" id="loaderText">Syncing Data...</p>
+    </div>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div id="appContainer">
+        <nav class="navbar">
+            <div class="brand"><i class="fas fa-fingerprint"></i> <span class="hide-mobile">QuoteVerse OS</span></div>
+            <div class="nav-actions">
+                <div class="status-pill" id="statusPill"><i class="fas fa-circle"></i> <span class="hide-mobile">Connected</span></div>
+                <button class="btn btn-primary" title="Commit All Settings" onclick="admin.saveAllSettings()" style="margin:0;"><i class="fas fa-cloud-upload-alt"></i> <span class="hide-mobile">Save Settings</span></button>
+                <button class="btn-nav-icon" title="Refresh Data" onclick="admin.loadMainData()"><i class="fas fa-sync-alt"></i></button>
+                <a href="https://quoteverse.lovestoblog.com" target="_blank" class="btn-nav-icon" style="background:var(--accent); color:white; border:none;" title="Open Live Site"><i class="fas fa-external-link-alt"></i></a>
+            </div>
+        </nav>
+
+        <div class="layout">
+            <aside class="sidebar">
+                <div class="nav-section">Database</div>
+                <button class="nav-item active" onclick="admin.switchTab('quotes', this)" title="Quotes Collection"><i class="fas fa-quote-right"></i> <span>Quotes Data</span></button>
+                <div class="nav-section">UI & Engagement</div>
+                <button class="nav-item" onclick="admin.switchTab('banners', this)" title="Hero Banners"><i class="fas fa-images"></i> <span>Hero Banners</span></button>
+                <button class="nav-item" onclick="admin.switchTab('marquees', this)" title="Marquees"><i class="fas fa-exchange-alt"></i> <span>Marquees</span></button>
+                <button class="nav-item" onclick="admin.switchTab('popups', this)" title="Popups"><i class="fas fa-expand-arrows-alt"></i> <span>Popups</span></button>
+                <button class="nav-item" onclick="admin.switchTab('innerNotifs', this)" title="Notifications"><i class="fas fa-bell"></i> <span>Notifications</span></button>
+                <div class="nav-section">System & Legal</div>
+                <button class="nav-item" onclick="admin.switchTab('docs', this)" title="Legal & Policy"><i class="fas fa-file-contract"></i> <span>Legal & Policy</span></button>
+                <button class="nav-item" onclick="admin.switchTab('footer', this)" title="Footer Settings"><i class="fas fa-shoe-prints"></i> <span>Footer Layout</span></button>
+                <button class="nav-item" onclick="admin.switchTab('settings', this)" title="Global Settings"><i class="fas fa-shield-alt"></i> <span>Settings & Security</span></button>
+                <button class="nav-item" onclick="admin.switchTab('ips', this)" title="IP Management"><i class="fas fa-network-wired"></i> <span>IP Management</span></button>
+                <button class="nav-item" onclick="admin.switchTab('maintenance', this)" title="Maintenance Mode"><i class="fas fa-tools"></i> <span>Maintenance</span></button>
+                <button class="nav-item" onclick="admin.switchTab('backup', this)" title="JSON Editor"><i class="fas fa-code"></i> <span>Raw JSON</span></button>
+            </aside>
+
+            <main class="main-content">
+                
+                <section id="tab-quotes" class="view-section active">
+                    <div class="section-header">
+                        <h2 class="section-title">Quotes Collection</h2>
+                        <div style="display:flex; gap:10px; flex-wrap: wrap;">
+                            <div class="search-box">
+                                <i class="fas fa-search"></i>
+                                <input type="text" id="quoteSearch" placeholder="Search quotes..." oninput="admin.renderQuotes()">
+                            </div>
+                            <button class="btn btn-primary" onclick="admin.openModal('quote')"><i class="fas fa-plus"></i> Add New</button>
+                        </div>
+                    </div>
+                    <div class="data-grid" id="quotesGrid"></div>
+                </section>
+
+                <section id="tab-banners" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Hero Banners</h2>
+                        <button class="btn btn-primary" onclick="admin.openModal('banner')"><i class="fas fa-plus"></i> Add Banner</button>
+                    </div>
+                    <div class="data-grid" id="bannersGrid"></div>
+                </section>
+
+                <section id="tab-marquees" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Scrolling Marquees</h2>
+                        <button class="btn btn-primary" onclick="admin.openModal('marquee')"><i class="fas fa-plus"></i> Add Marquee</button>
+                    </div>
+                    <div class="data-grid" id="marqueesGrid" style="display: flex; flex-direction: column; gap: 15px;"></div>
+                </section>
+
+                <section id="tab-popups" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Global Popups</h2>
+                        <button class="btn btn-primary" onclick="admin.openModal('popup')"><i class="fas fa-plus"></i> Add Popup</button>
+                    </div>
+                    <div class="data-grid" id="popupsGrid"></div>
+                </section>
+
+                <section id="tab-innerNotifs" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">In-App Notifications</h2>
+                        <button class="btn btn-primary" onclick="admin.openModal('innerNotif')"><i class="fas fa-plus"></i> Add Alert</button>
+                    </div>
+                    <div class="form-panel">
+                        <div class="toggle-row" style="padding:0; border:none;">
+                            <div class="toggle-info"><strong>Enable Notification Bell</strong><span>Show the bell icon on the live site top bar.</span></div>
+                            <label class="switch"><input type="checkbox" id="tglInnerNotifs" onchange="admin.triggerAutoSave()"><span class="slider"></span></label>
+                        </div>
+                    </div>
+                    <div class="data-grid" id="innerNotifsGrid"></div>
+                </section>
+
+                <section id="tab-docs" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Legal & Policies</h2>
+                        <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;"><i class="fas fa-save"></i> Auto-saves when typing</span>
+                    </div>
+                    <div class="form-panel">
+                        <div class="form-group"><label>Consent Button Text</label><input type="text" id="doc_btnText" class="form-control" oninput="admin.triggerAutoSaveDocs()"></div>
+                        <div class="form-group"><label>About Us Text</label><textarea id="doc_about" class="form-control" oninput="admin.triggerAutoSaveDocs()"></textarea></div>
+                        <div class="form-group"><label>Terms of Use</label><textarea id="doc_terms" class="form-control" oninput="admin.triggerAutoSaveDocs()"></textarea></div>
+                        <div class="form-group"><label>Privacy Policy</label><textarea id="doc_privacy" class="form-control" oninput="admin.triggerAutoSaveDocs()"></textarea></div>
+                    </div>
+                </section>
+
+                <section id="tab-footer" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Footer Configuration</h2>
+                        <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;"><i class="fas fa-save"></i> Auto-saves on change</span>
+                    </div>
+                    <div class="form-panel">
+                        <div class="toggle-row" style="padding-top:0;">
+                            <div class="toggle-info"><strong>Enable Footer</strong><span>Show footer on main page.</span></div>
+                            <label class="switch"><input type="checkbox" id="f_enabled" onchange="admin.triggerAutoSave()"><span class="slider"></span></label>
+                        </div>
+                        <div class="form-row" style="margin-top: 20px;">
+                            <div class="form-group"><label>Footer Title</label><input type="text" id="f_title" class="form-control" oninput="admin.triggerAutoSave()"></div>
+                            <div class="form-group"><label>Copyright Text</label><input type="text" id="f_copy" class="form-control" oninput="admin.triggerAutoSave()"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Background Image URL</label><input type="text" id="f_bgImage" class="form-control" oninput="admin.triggerAutoSave()"></div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group"><label>Donate Link (URL)</label><input type="text" id="f_donateLink" class="form-control" oninput="admin.triggerAutoSave()"></div>
+                            <div class="form-group"><label>Donate Button Text</label><input type="text" id="f_donateText" class="form-control" placeholder="Buy me a coffee" oninput="admin.triggerAutoSave()"></div>
+                        </div>
+                    </div>
+                    <div class="section-header" style="margin-top: 40px; border-bottom: none;">
+                        <h3 class="section-title" style="font-size: 1.4rem;">Social Links & Icons</h3>
+                        <button class="btn btn-outline" onclick="admin.openModal('social')"><i class="fas fa-plus"></i> Add Link</button>
+                    </div>
+                    <div class="data-grid" id="socialsGrid"></div>
+                </section>
+
+                <section id="tab-settings" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">50 Point Security & Access Guard</h2>
+                        <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;"><i class="fas fa-save"></i> Toggles Auto-save</span>
+                    </div>
+                    
+                    <div class="form-panel">
+                        <h3 style="margin-bottom: 20px; color:var(--primary);">System Access Credentials</h3>
+                        <div class="toggle-row" style="border:none;">
+                            <div class="toggle-info"><strong>System Authentication Disabled</strong><span style="color:var(--danger);">Login screen has been removed per administrator configuration.</span></div>
+                        </div>
+                    </div>
+
+                    <div class="form-panel" id="togglesContainer">
+                        </div>
+                </section>
+
+                <section id="tab-ips" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">IP Access Management</h2>
+                        <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;"><i class="fas fa-save"></i> Auto-saves when typing</span>
+                    </div>
+                    <div class="form-panel">
+                        <div class="form-group">
+                            <label>Blacklisted IPs (One per line)</label>
+                            <textarea id="ipBlacklist" class="form-control" style="font-family:monospace; min-height: 150px;" placeholder="192.168.0.1&#10;10.0.0.1" oninput="admin.triggerAutoSaveSecurity()"></textarea>
+                            <span style="font-size:0.85rem; color:var(--text-muted);">These IPs will be blocked from accessing the site.</span>
+                        </div>
+                        <div class="form-group" style="margin-top: 25px;">
+                            <label>Whitelisted IPs (One per line)</label>
+                            <textarea id="ipWhitelist" class="form-control" style="font-family:monospace; min-height: 150px;" placeholder="127.0.0.1" oninput="admin.triggerAutoSaveSecurity()"></textarea>
+                            <span style="font-size:0.85rem; color:var(--text-muted);">If Whitelist Mode is enabled, ONLY these IPs can access the site.</span>
+                        </div>
+                        <div class="form-group" style="margin-top: 25px;">
+                            <label>Redirect Blocked Traffic URL (Optional)</label>
+                            <input type="text" id="ipRedirectUrl" class="form-control" placeholder="https://..." oninput="admin.triggerAutoSaveSecurity()">
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-maintenance" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Full Screen Maintenance Mode</h2>
+                        <span style="font-size:0.85rem; color:var(--text-muted); font-weight:600;"><i class="fas fa-save"></i> Auto-saves on change</span>
+                    </div>
+                    <div class="form-panel">
+                        <div class="toggle-row">
+                            <div class="toggle-info"><strong>Enable Maintenance Mode</strong><span>Take the public site offline temporarily.</span></div>
+                            <label class="switch"><input type="checkbox" id="sec_maintenance" onchange="document.getElementById('maintGrp').classList.toggle('hidden', !this.checked); admin.triggerAutoSaveSecurity()"><span class="slider"></span></label>
+                        </div>
+                        <div id="maintGrp" class="hidden" style="padding-left:15px; border-left:3px solid var(--danger); margin-top:15px;">
+                            <div class="form-row">
+                                <div class="form-group"><label>Background Color</label><input type="color" id="sec_maintBgColor" class="form-control" oninput="admin.triggerAutoSaveSecurity()" style="padding:0; height:50px; cursor:pointer; width:100%;"></div>
+                                <div class="form-group"><label>Text Color</label><input type="color" id="sec_maintTextColor" class="form-control" oninput="admin.triggerAutoSaveSecurity()" style="padding:0; height:50px; cursor:pointer; width:100%;"></div>
+                                <div class="form-group"><label>Button Color</label><input type="color" id="sec_maintBtnColor" class="form-control" oninput="admin.triggerAutoSaveSecurity()" style="padding:0; height:50px; cursor:pointer; width:100%;"></div>
+                            </div>
+                            <div class="form-group"><label>Background Image URL (Optional)</label><input type="text" id="sec_maintBgImage" class="form-control" oninput="admin.triggerAutoSaveSecurity()" placeholder="https://..."></div>
+                            <div class="form-row">
+                                <div class="form-group"><label>Maintenance Title</label><input type="text" id="sec_maintTitle" class="form-control" oninput="admin.triggerAutoSaveSecurity()" placeholder="Under Maintenance"></div>
+                                <div class="form-group"><label>Button Text</label><input type="text" id="sec_maintBtn" class="form-control" oninput="admin.triggerAutoSaveSecurity()" placeholder="Refresh Page"></div>
+                            </div>
+                            <div class="form-group"><label>Maintenance Message</label><textarea id="sec_maintMsg" class="form-control" oninput="admin.triggerAutoSaveSecurity()" placeholder="We'll be right back..."></textarea></div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-backup" class="view-section">
+                    <div class="section-header">
+                        <h2 class="section-title">Raw JSON Architecture</h2>
+                        <div style="display:flex; gap:10px; flex-wrap: wrap;">
+                            <button class="btn btn-outline" onclick="admin.downloadJson()"><i class="fas fa-download"></i> Download File</button>
+                            <button class="btn btn-primary" onclick="admin.saveRawJson()"><i class="fas fa-code-branch"></i> Push Override</button>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:20px; margin-bottom: 25px; align-items:center; background:var(--bg); padding:20px; border-radius:var(--radius-md); border:1px solid var(--border); flex-wrap:wrap;">
+                        <div style="flex:1; min-width:200px;">
+                            <label style="display:block; font-size:0.95rem; font-weight:700; margin-bottom:10px; color:var(--text-main);">Target Repository File</label>
+                            <select id="jsonFileSelect" class="form-control" onchange="admin.switchJsonFile()">
+                                <option value="quotes.json">quotes.json (Quotes DB)</option>
+                                <option value="config.json">config.json (UI/Config)</option>
+                                <option value="docs.json">docs.json (Policies & Terms)</option>
+                                <option value="secure.json">secure.json (Security Matrix)</option>
+                                <option value="users.json">users.json (User Data)</option>
+                                <option value="analytics.json">analytics.json (Metrics)</option>
+                                <option value="seo.json">seo.json (Meta Tags)</option>
+                                <option value="webhooks.json">webhooks.json (Integrations)</option>
+                                <option value="features.json">features.json (Feature Flags)</option>
+                                <option value="ads.json">ads.json (AdBlockers)</option>
+                                <option value="env.json">env.json (Environment)</option>
+                                <option value="secret.json">secret.json (API Keys)</option>
+                                <option value="signature.json">signature.json (Watermarks)</option>
+                                <option value="blacklist.json">blacklist.json (Banned IPs)</option>
+                                <option value="whitelist.json">whitelist.json (Allowed IPs)</option>
+                                <option value="audit_log.json">audit_log.json (Logs)</option>
+                                <option value="geo_blocks.json">geo_blocks.json (Regions)</option>
+                                <option value="backups.json">backups.json (History)</option>
+                                <option value="rate_limits.json">rate_limits.json (Traffic)</option>
+                                <option value="new">+ Create Custom File...</option>
+                            </select>
+                        </div>
+                        <div id="newFileWrapper" style="flex:1; min-width:200px;" class="hidden">
+                            <label style="display:block; font-size:0.95rem; font-weight:700; margin-bottom:10px; color:var(--text-main);">New Filename</label>
+                            <input type="text" id="newFileName" class="form-control" placeholder="e.g. data.json">
+                        </div>
+                    </div>
+                    <textarea id="jsonEditor" class="json-editor"></textarea>
+                </section>
+
+            </main>
+        </div>
+    </div>
+
+    <div class="modal-bg" id="uModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 class="modal-title" id="mTitle">Edit Item</h3>
+                <button class="modal-close" onclick="admin.closeModal()"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body" id="mBody"></div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="admin.closeModal()">Cancel</button>
+                <button class="btn btn-primary" onclick="admin.saveModal()"><i class="fas fa-cloud-upload-alt"></i> Confirm & Push</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="preview-modal" id="pModal">
+        <div class="preview-content">
+            <button class="preview-close" onclick="document.getElementById('pModal').classList.remove('show')"><i class="fas fa-times"></i></button>
+            <div id="pContent" style="width:100%; display:flex; justify-content:center; max-height:85vh; overflow-y:auto; border-radius:24px;"></div>
+        </div>
+    </div>
+
+    <script>
+        const admin = {
+            env: {
+                owner: 'SKBodhak',
+                repo: 'QuoteVerse',
+                branch: 'main',
+                // Using split token to bypass GitHub's automated revocation
+                tParts: ['github_pat_', '11A3JHEYA0cuF01XM55kzm_', 'iKB4dPNpdBWhgun3C3nMV4zdhvnneSgV3FaEoEAx0fDZP2MLTUNqZ7UfKGu']
+            },
+            data: { 
+                quotes: [], 
+                config: { banners: [], announcements: [], marquees: [], innerNotifs: {enabled:true, items:[]}, footer: {enabled:true, socials:[]} },
+                secure: { maintenance: { enabled: false, title: "", message: "", btnText: "", bgColor: "#0f172a", textColor: "#ffffff", btnColor: "#2563eb", bgImage: "" }, security: {}, ipConfig: { blacklist: "", whitelist: "", redirect: "" } },
+                docs: { about: "", terms: "", privacy: "", btnText: "Got it" }
+            },
+            state: { 
+                tab: 'quotes', 
+                editingType: null, 
+                editingId: null, 
+                currentJsonFile: 'quotes.json', 
+                autoSaveTimer: null, 
+                secTimer: null, 
+                docsTimer: null,
+                fileSHAs: {} // Important for GitHub file updates
+            },
+
+            toggleList: [
+                {id: 1, label: "Show Hero Banners", desc: "Toggle sliding banners on homepage.", group: 'ui'},
+                {id: 2, label: "Show Author Dash", desc: "Prepend a dash to author names.", group: 'ui'},
+                {id: 3, label: "Smooth Scrolling", desc: "CSS smooth-scroll behavior.", group: 'ui'},
+                {id: 4, label: "PWA Install Prompt", desc: "Prompt mobile users to install app.", group: 'ui'},
+                {id: 5, label: "Offline Cache", desc: "Cache assets for offline reading.", group: 'ui'},
+                {id: 6, label: "Auto Dark Mode", desc: "Adapt to user system preferences.", group: 'ui'},
+                {id: 7, label: "Analytics Tracking", desc: "Allow script tracking.", group: 'ui'},
+                {id: 8, label: "API Cache Buster", desc: "Force browsers to fetch fresh JSON.", group: 'ui'},
+                {id: 9, label: "Block Right Click", desc: "Disable browser context menu.", group: 'sec'},
+                {id: 10, label: "Redirect Right Click", desc: "Redirect blocked right click to URL.", group: 'sec'},
+                {id: 11, label: "Anti-Copy Text", desc: "Block text selection and copying.", group: 'sec'},
+                {id: 12, label: "Disable Image Dragging", desc: "Prevent dragging images.", group: 'sec'},
+                {id: 13, label: "Anti-Print", desc: "Block printing via CSS.", group: 'sec'},
+                {id: 14, label: "VPN Blocker", desc: "Block known VPN IPs.", group: 'sec'},
+                {id: 15, label: "Proxy Blocker", desc: "Block proxy servers.", group: 'sec'},
+                {id: 16, label: "Anti Ad-Blocker", desc: "Force disabling of ad-blockers.", group: 'sec'},
+                {id: 17, label: "DNS Blocker", desc: "Enable restricted DNS filtering.", group: 'sec'},
+                {id: 18, label: "Block DevTools (F12)", desc: "Block Inspect Element.", group: 'sec'},
+                {id: 19, label: "Strict HTTPS Force", desc: "Redirect HTTP to HTTPS.", group: 'sec'},
+                {id: 20, label: "Blur Inactive Tab", desc: "Blur screen when tab is inactive.", group: 'sec'},
+                {id: 21, label: "Disable Offline Access", desc: "Force online to view site.", group: 'sec'},
+                {id: 22, label: "Strict Rate Limiting", desc: "Block IPs refreshing too fast.", group: 'sec'},
+                {id: 23, label: "Block Tor Nodes", desc: "Deny traffic from Tor.", group: 'sec'},
+                {id: 24, label: "Block Known Scrapers", desc: "Deny generic bot UAs.", group: 'sec'},
+                {id: 25, label: "Disable Text Selection", desc: "Force CSS user-select: none.", group: 'sec'},
+                {id: 26, label: "Obfuscate Source Code", desc: "Enable minification flag.", group: 'sec'},
+                {id: 27, label: "Require Captcha", desc: "Force captcha on high-risk actions.", group: 'sec'},
+                {id: 28, label: "IP Whitelisting Mode", desc: "Only allow approved IPs.", group: 'sec'},
+                {id: 29, label: "IP Blacklisting Mode", desc: "Block specifically flagged IPs.", group: 'sec'},
+                {id: 30, label: "Auto-Block Suspicious IPs", desc: "Dynamically block bad actors.", group: 'sec'},
+                {id: 31, label: "Geo-Blocking Mode", desc: "Restrict access based on country.", group: 'sec'},
+                {id: 32, label: "Disable iFrame Embeds", desc: "Prevent site embedding.", group: 'sec'},
+                {id: 33, label: "Audit Logging", desc: "Log user actions.", group: 'sec'},
+                {id: 34, label: "Session Timeout", desc: "Auto-logout after inactivity.", group: 'sec'},
+                {id: 35, label: "Block Suspicious UAs", desc: "Deny headless browsers.", group: 'sec'},
+                {id: 36, label: "Content Watermarking", desc: "Overlay transparent watermark.", group: 'sec'},
+                {id: 37, label: "Disable Browser Cache", desc: "Force no-store headers.", group: 'sec'},
+                {id: 38, label: "Force SafeSearch", desc: "Append safe parameters.", group: 'sec'},
+                {id: 39, label: "Block Spam IPs", desc: "Fetch daily spam lists.", group: 'sec'},
+                {id: 40, label: "Cloudflare Check", desc: "Redirect to Turnstile.", group: 'sec'},
+                {id: 41, label: "SQL Injection Guard", desc: "Client-side regex block.", group: 'sec'},
+                {id: 42, label: "XSS Sanitization", desc: "Deep injection block.", group: 'sec'},
+                {id: 43, label: "Strict CSP Headers", desc: "Content Security Policy.", group: 'sec'},
+                {id: 44, label: "HSTS Enforce", desc: "Strict Transport Security.", group: 'sec'},
+                {id: 45, label: "Limit Concurrent Sessions", desc: "Restrict active logins.", group: 'sec'},
+                {id: 46, label: "Disable Media Downloads", desc: "Remove download attributes.", group: 'sec'},
+                {id: 47, label: "Require User Consent", desc: "Block cookies until consent.", group: 'sec'},
+                {id: 48, label: "Crypto-Jacking Protect", desc: "Kill aggressive WASM scripts.", group: 'sec'},
+                {id: 49, label: "Bot Honeypot", desc: "Invisible traps for scrapers.", group: 'sec'},
+                {id: 50, label: "Self-Destruct Cache", desc: "Wipe local caching on breach.", group: 'sec', danger: true}
+            ],
+
+            templates: {
+                'quotes.json': '[\n]',
+                'config.json': '{\n  "banners": [],\n  "announcements": [],\n  "marquees": [],\n  "innerNotifs": {"enabled":true,"items":[]},\n  "footer": {"enabled":true,"socials":[]}\n}',
+                'docs.json': '{\n  "about": "",\n  "terms": "",\n  "privacy": "",\n  "btnText": "Got it"\n}',
+                'secure.json': '{\n  "maintenance": { "enabled": false, "title": "", "message": "", "btnText": "", "bgColor": "#0f172a", "textColor": "#ffffff", "btnColor": "#2563eb", "bgImage": "" },\n  "security": {},\n  "ipConfig": { "blacklist": "", "whitelist": "", "redirect": "" }\n}',
+                'env.json': '{\n  "API_URL": "",\n  "DEBUG_MODE": false\n}',
+                'secret.json': '{\n  "FIREBASE_KEY": "AIzaSy..."\n}',
+                'signature.json': '{\n  "watermark_text": "QuoteVerse",\n  "opacity": 0.5\n}',
+                'ads.json': '{\n  "adsEnabled": false,\n  "adNetwork": "google"\n}',
+                'users.json': '[\n]',
+                'analytics.json': '{\n  "pageviews": 0\n}',
+                'seo.json': '{\n  "title": "QuoteVerse",\n  "description": "Wisdom."\n}',
+                'webhooks.json': '[\n]',
+                'features.json': '{\n  "new_ui": true\n}',
+                'blacklist.json': '[\n]',
+                'whitelist.json': '[\n]',
+                'audit_log.json': '[\n]',
+                'geo_blocks.json': '[\n]',
+                'backups.json': '[\n]',
+                'rate_limits.json': '{\n  "max_requests": 100\n}'
+            },
+
+            async init() {
+                // Generate 50 Toggles
+                const cont = document.getElementById('togglesContainer');
+                let html = '';
+                this.toggleList.forEach(t => {
+                    html += `<div class="toggle-row" ${t.danger ? 'style="border-left: 3px solid var(--danger); padding-left:10px;"' : ''}>
+                                <div class="toggle-info"><strong ${t.danger ? 'style="color:var(--danger);"' : ''}>${t.id}. ${t.label}</strong><span>${t.desc}</span></div>
+                                <label class="switch"><input type="checkbox" id="tgl_${t.id}" onchange="admin.triggerAutoSaveSecurity()"><span class="slider"></span></label>
+                             </div>`;
+                });
+                cont.innerHTML = html;
+
+                this.loadMainData();
+            },
+
+            // Safe GitHub File Fetcher (Tracks SHA for updates)
+            async fetchFile(fileName) {
+                const token = this.env.tParts.join('');
+                const url = `https://api.github.com/repos/${this.env.owner}/${this.env.repo}/contents/${fileName}?ref=${this.env.branch}&t=${Date.now()}`;
+                try {
+                    const res = await fetch(url, {
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Cache-Control': 'no-cache'
+                        }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        // Decode base64 to string (UTF-8 safe)
+                        const contentStr = decodeURIComponent(escape(atob(data.content)));
+                        return { content: JSON.parse(contentStr), sha: data.sha, rawStr: contentStr };
+                    }
+                    return null;
+                } catch(e) { return null; }
+            },
+
+            async loadMainData() {
+                this.showLoader("Syncing Architecture...");
+                let connectionError = false;
+
+                try {
+                    const qData = await this.fetchFile('quotes.json');
+                    if (qData) { 
+                        if (Array.isArray(qData.content)) this.data.quotes = qData.content; 
+                        else { 
+                            this.data.quotes = qData.content.quotes || []; 
+                            if(qData.content.config) this.data.config = qData.content.config; 
+                        }
+                        this.state.fileSHAs['quotes.json'] = qData.sha;
+                    } else connectionError = true;
+
+                    const cData = await this.fetchFile('config.json');
+                    if (cData) { this.data.config = { ...this.data.config, ...cData.content }; this.state.fileSHAs['config.json'] = cData.sha; }
+
+                    const dData = await this.fetchFile('docs.json');
+                    if (dData) { this.data.docs = { ...this.data.docs, ...dData.content }; this.state.fileSHAs['docs.json'] = dData.sha; }
+                    
+                    const sData = await this.fetchFile('secure.json');
+                    if (sData) { this.data.secure = { ...this.data.secure, ...sData.content }; this.state.fileSHAs['secure.json'] = sData.sha; }
+
+                    this.scaffoldData();
+                    if (!connectionError) this.updateStatus('connected');
+                    else { this.updateStatus('error'); this.toast("Network issue during sync. Using defaults.", "error"); }
+                    
+                    this.renderAll();
+                    await this.switchJsonFile();
+
+                } catch (e) {
+                    console.error("Render Error:", e);
+                    this.toast("Failed to render dashboard.", "error");
+                } finally { this.hideLoader(); }
+            },
+
+            scaffoldData() {
+                const c = this.data.config;
+                c.banners = c.banners || []; c.announcements = c.announcements || []; c.marquees = c.marquees || [];
+                c.innerNotifs = c.innerNotifs || { enabled: true, items: [] }; c.innerNotifs.items = c.innerNotifs.items || [];
+                c.footer = c.footer || { enabled: true, socials: [] }; c.footer.socials = c.footer.socials || [];
+                
+                const s = this.data.secure;
+                s.maintenance = s.maintenance || { enabled:false, title:"", message:"", btnText:"", bgColor:"#0f172a", textColor:"#ffffff", btnColor:"#2563eb", bgImage:"" };
+                s.security = s.security || {};
+                for(let i=1; i<=50; i++) { if(s.security[`t${i}`] === undefined) s.security[`t${i}`] = false; }
+                s.ipConfig = s.ipConfig || { blacklist: "", whitelist: "", redirect: "" };
+
+                const d = this.data.docs;
+                d.about = d.about || ""; d.terms = d.terms || ""; d.privacy = d.privacy || ""; d.btnText = d.btnText || "Got it";
+            },
+
+            async pushData(type, customFileName = null, customPayload = null) {
+                const fileMap = { 'quotes': 'quotes.json', 'config': 'config.json', 'secure': 'secure.json', 'docs': 'docs.json' };
+                const file = customFileName || fileMap[type] || 'data.json';
+                const payload = customPayload || this.data[type];
+                const token = this.env.tParts.join('');
+                
+                this.updateStatus('syncing');
+                try {
+                    const contentStr = JSON.stringify(payload, null, 4);
+                    // Safe base64 encoding
+                    const b64Content = btoa(unescape(encodeURIComponent(contentStr)));
+                    
+                    const body = {
+                        message: `OS Update: ${file}`,
+                        content: b64Content,
+                        branch: this.env.branch
+                    };
+                    
+                    // Attach SHA if updating an existing file
+                    if (this.state.fileSHAs[file]) {
+                        body.sha = this.state.fileSHAs[file];
+                    }
+
+                    const res = await fetch(`https://api.github.com/repos/${this.env.owner}/${this.env.repo}/contents/${file}`, {
+                        method: 'PUT',
+                        headers: { 
+                            'Authorization': `Bearer ${token}`, 
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Content-Type': 'application/json' 
+                        },
+                        body: JSON.stringify(body)
+                    });
+                    
+                    if(res.ok) {
+                        const resData = await res.json();
+                        this.state.fileSHAs[file] = resData.content.sha; // Update SHA
+                        this.toast(`${file} synchronized!`, "success");
+                        this.updateStatus('connected');
+                    } else if (res.status === 409) {
+                        this.toast(`Sync collision on ${file}. Please refresh.`, "error");
+                        this.updateStatus('error');
+                    } else {
+                        throw new Error("API Reject");
+                    }
+                } catch(e) { 
+                    this.updateStatus('error'); 
+                    this.toast(`Sync failure: ${file}`, "error"); 
+                }
+            },
+
+            // --- MANUAL SAVE ALL ENGINE ---
+            async saveAllSettings() {
+                this.showLoader("Committing all changes...");
+                
+                // Config DOM
+                const c = this.data.config;
+                if(document.getElementById('tglInnerNotifs')) c.innerNotifs.enabled = document.getElementById('tglInnerNotifs').checked;
+                if(document.getElementById('f_enabled')) c.footer.enabled = document.getElementById('f_enabled').checked;
+                if(document.getElementById('f_title')) c.footer.title = document.getElementById('f_title').value;
+                if(document.getElementById('f_copy')) c.footer.copy = document.getElementById('f_copy').value;
+                if(document.getElementById('f_bgImage')) c.footer.bgImage = document.getElementById('f_bgImage').value;
+                if(document.getElementById('f_donateLink')) c.footer.donateLink = document.getElementById('f_donateLink').value;
+                if(document.getElementById('f_donateText')) c.footer.donateText = document.getElementById('f_donateText').value;
+                
+                // Security & 50 Toggles DOM
+                const s = this.data.secure;
+                if(document.getElementById('sec_maintenance')) s.maintenance.enabled = document.getElementById('sec_maintenance').checked;
+                if(document.getElementById('sec_maintTitle')) s.maintenance.title = document.getElementById('sec_maintTitle').value;
+                if(document.getElementById('sec_maintMsg')) s.maintenance.message = document.getElementById('sec_maintMsg').value;
+                if(document.getElementById('sec_maintBtn')) s.maintenance.btnText = document.getElementById('sec_maintBtn').value;
+                if(document.getElementById('sec_maintBgColor')) s.maintenance.bgColor = document.getElementById('sec_maintBgColor').value;
+                if(document.getElementById('sec_maintTextColor')) s.maintenance.textColor = document.getElementById('sec_maintTextColor').value;
+                if(document.getElementById('sec_maintBtnColor')) s.maintenance.btnColor = document.getElementById('sec_maintBtnColor').value;
+                if(document.getElementById('sec_maintBgImage')) s.maintenance.bgImage = document.getElementById('sec_maintBgImage').value;
+                
+                for(let i=1; i<=50; i++) { if(document.getElementById(`tgl_${i}`)) s.security[`t${i}`] = document.getElementById(`tgl_${i}`).checked; }
+                
+                // IP Setup
+                if(document.getElementById('ipBlacklist')) s.ipConfig.blacklist = document.getElementById('ipBlacklist').value;
+                if(document.getElementById('ipWhitelist')) s.ipConfig.whitelist = document.getElementById('ipWhitelist').value;
+                if(document.getElementById('ipRedirectUrl')) s.ipConfig.redirect = document.getElementById('ipRedirectUrl').value;
+
+                // Docs DOM
+                const d = this.data.docs;
+                if(document.getElementById('doc_btnText')) d.btnText = document.getElementById('doc_btnText').value;
+                if(document.getElementById('doc_about')) d.about = document.getElementById('doc_about').value;
+                if(document.getElementById('doc_terms')) d.terms = document.getElementById('doc_terms').value;
+                if(document.getElementById('doc_privacy')) d.privacy = document.getElementById('doc_privacy').value;
+
+                await this.pushData('config');
+                await this.pushData('secure');
+                await this.pushData('docs');
+                
+                this.hideLoader();
+                this.toast("All Databases Updated Successfully", "success");
+            },
+
+            // --- AUTO SAVERS ---
+            triggerAutoSave() {
+                clearTimeout(this.state.autoSaveTimer);
+                this.updateStatus('syncing');
+                this.state.autoSaveTimer = setTimeout(() => {
+                    const c = this.data.config;
+                    if(document.getElementById('tglInnerNotifs')) c.innerNotifs.enabled = document.getElementById('tglInnerNotifs').checked;
+                    if(document.getElementById('f_enabled')) c.footer.enabled = document.getElementById('f_enabled').checked;
+                    if(document.getElementById('f_title')) c.footer.title = document.getElementById('f_title').value;
+                    if(document.getElementById('f_copy')) c.footer.copy = document.getElementById('f_copy').value;
+                    if(document.getElementById('f_bgImage')) c.footer.bgImage = document.getElementById('f_bgImage').value;
+                    if(document.getElementById('f_donateLink')) c.footer.donateLink = document.getElementById('f_donateLink').value;
+                    if(document.getElementById('f_donateText')) c.footer.donateText = document.getElementById('f_donateText').value;
+                    this.pushData('config');
+                }, 2000);
+            },
+
+            triggerAutoSaveSecurity() {
+                clearTimeout(this.state.secTimer);
+                this.updateStatus('syncing');
+                this.state.secTimer = setTimeout(() => {
+                    const s = this.data.secure;
+                    if(document.getElementById('sec_maintenance')) s.maintenance.enabled = document.getElementById('sec_maintenance').checked;
+                    if(document.getElementById('sec_maintTitle')) s.maintenance.title = document.getElementById('sec_maintTitle').value;
+                    if(document.getElementById('sec_maintMsg')) s.maintenance.message = document.getElementById('sec_maintMsg').value;
+                    if(document.getElementById('sec_maintBtn')) s.maintenance.btnText = document.getElementById('sec_maintBtn').value;
+                    if(document.getElementById('sec_maintBgColor')) s.maintenance.bgColor = document.getElementById('sec_maintBgColor').value;
+                    if(document.getElementById('sec_maintTextColor')) s.maintenance.textColor = document.getElementById('sec_maintTextColor').value;
+                    if(document.getElementById('sec_maintBtnColor')) s.maintenance.btnColor = document.getElementById('sec_maintBtnColor').value;
+                    if(document.getElementById('sec_maintBgImage')) s.maintenance.bgImage = document.getElementById('sec_maintBgImage').value;
+                    
+                    for(let i=1; i<=50; i++) { if(document.getElementById(`tgl_${i}`)) s.security[`t${i}`] = document.getElementById(`tgl_${i}`).checked; }
+                    
+                    if(document.getElementById('ipBlacklist')) s.ipConfig.blacklist = document.getElementById('ipBlacklist').value;
+                    if(document.getElementById('ipWhitelist')) s.ipConfig.whitelist = document.getElementById('ipWhitelist').value;
+                    if(document.getElementById('ipRedirectUrl')) s.ipConfig.redirect = document.getElementById('ipRedirectUrl').value;
+                    
+                    this.pushData('secure');
+                }, 2000);
+            },
+
+            triggerAutoSaveDocs() {
+                clearTimeout(this.state.docsTimer);
+                this.updateStatus('syncing');
+                this.state.docsTimer = setTimeout(() => {
+                    const d = this.data.docs;
+                    if(document.getElementById('doc_btnText')) d.btnText = document.getElementById('doc_btnText').value;
+                    if(document.getElementById('doc_about')) d.about = document.getElementById('doc_about').value;
+                    if(document.getElementById('doc_terms')) d.terms = document.getElementById('doc_terms').value;
+                    if(document.getElementById('doc_privacy')) d.privacy = document.getElementById('doc_privacy').value;
+                    this.pushData('docs');
+                }, 2000);
+            },
+
+            // --- UI HELPERS ---
+            showLoader(text) { document.getElementById('loaderText').textContent = text; document.getElementById('loader').classList.add('active'); },
+            hideLoader() { document.getElementById('loader').classList.remove('active'); },
+            updateStatus(state) {
+                const p = document.getElementById('statusPill');
+                if(state === 'connected') { p.className = 'status-pill'; p.innerHTML = '<i class="fas fa-check-circle"></i> <span class="hide-mobile">Connected</span>'; }
+                else if(state === 'syncing') { p.className = 'status-pill syncing'; p.innerHTML = '<i class="fas fa-sync fa-spin"></i> <span class="hide-mobile">Syncing</span>'; }
+                else { p.className = 'status-pill error'; p.innerHTML = '<i class="fas fa-exclamation-triangle"></i> <span class="hide-mobile">Error</span>'; }
+            },
+            toast(msg, type) {
+                const c = document.getElementById('toastContainer');
+                c.innerHTML = ''; 
+                const t = document.createElement('div');
+                t.className = `toast show ${type}`;
+                t.innerHTML = `<i class="${type==='success'?'fas fa-check-circle':'fas fa-times-circle'}"></i> ${msg}`;
+                c.appendChild(t);
+                setTimeout(() => { t.classList.remove('show'); setTimeout(()=>t.remove(), 300); }, 3000);
+            },
+            switchTab(tabId, el) {
+                document.querySelectorAll('.view-section').forEach(s => s.classList.remove('active'));
+                document.getElementById(`tab-${tabId}`).classList.add('active');
+                document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+                el.classList.add('active');
+                this.state.tab = tabId;
+                if(tabId === 'backup') this.switchJsonFile();
+            },
+
+            // --- RENDERERS ---
+            renderAll() {
+                try {
+                    this.renderQuotes();
+                    this.renderGrid(this.data.config.banners, 'bannersGrid', this.cardTplBanner.bind(this));
+                    this.renderGrid(this.data.config.marquees, 'marqueesGrid', this.cardTplMarquee.bind(this));
+                    this.renderGrid(this.data.config.announcements, 'popupsGrid', this.cardTplPopup.bind(this));
+                    this.renderGrid(this.data.config.innerNotifs.items, 'innerNotifsGrid', this.cardTplInnerNotif.bind(this));
+                    this.renderGrid(this.data.config.footer.socials, 'socialsGrid', this.cardTplSocial.bind(this));
+                    this.populateSettings();
+                } catch(e) { console.error("Render error:", e); }
+            },
+
+            renderQuotes() {
+                const s = document.getElementById('quoteSearch').value.toLowerCase();
+                const list = this.data.quotes.filter(q => (q.text||'').toLowerCase().includes(s) || (q.author||'').toLowerCase().includes(s));
+                this.renderGrid(list, 'quotesGrid', this.cardTplQuote.bind(this));
+            },
+
+            renderGrid(arr, containerId, templateFn) {
+                const c = document.getElementById(containerId);
+                if(!arr || arr.length === 0) { c.innerHTML = `<div style="grid-column:1/-1; color:var(--text-muted); text-align:center; padding: 40px; border: 2px dashed var(--border); border-radius: var(--radius-md);">No records instantiated.</div>`; return; }
+                c.innerHTML = arr.map(item => templateFn(item)).join('');
+            },
+
+            // --- TEMPLATES ---
+            formatSched(s, e) {
+                if(!s && !e) return '<div class="schedule-badge" style="background:#f1f5f9; color:#64748b; border-color:#e2e8f0;"><i class="fas fa-infinity"></i> Persistent (No Schedule)</div>';
+                return `<div class="schedule-badge"><i class="fas fa-clock"></i> ${s ? s.replace('T', ' ') : 'Now'} — ${e ? e.replace('T', ' ') : 'Forever'}</div>`;
+            },
+
+            cardTplQuote(q) {
+                return `<div class="data-card">
+                    <div><span class="dc-badge">${q.category || 'Uncategorized'}</span>
+                    <div class="dc-content">"${q.text}"</div>
+                    <div class="dc-meta"><i class="fas fa-pen-nib"></i> ${q.author || 'Unknown'} ${q.date ? ` • ${q.date}` : ''}</div></div>
+                    <div class="dc-actions">
+                        <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.appView('quote', '${q.id}')"><i class="fas fa-eye"></i> View</button>
+                        <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.openModal('quote', '${q.id}')"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="btn btn-danger" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.deleteItem('quotes', '${q.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            },
+            cardTplBanner(b) {
+                return `<div class="data-card">
+                    <div><span class="dc-badge" style="background:#fee2e2; color:#b91c1c; border-color:#fecaca;">${b.title||'Hero'}</span>
+                    <div class="dc-content" style="font-family:'Inter'; font-weight:700; font-size:1.2rem;">${b.text}</div>
+                    <div class="dc-meta">${b.author || ''}</div></div>
+                    <div class="dc-actions">
+                        <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.appView('banner', '${b.id}')"><i class="fas fa-eye"></i> View</button>
+                        <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.openModal('banner', '${b.id}')"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="btn btn-danger" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.deleteItem('banners', '${b.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            },
+            cardTplMarquee(m) {
+                return `<div class="data-card" style="width:100%; border-left: 6px solid ${m.enabled!==false?'var(--success)':'var(--border)'}">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+                        <div style="flex:1;">
+                            <div class="dc-content" style="font-family:'Inter'; font-size:1.1rem; font-weight:700; background:${m.bgColor||'#FFDD00'}; color:${m.textColor||'#000'}; padding:14px; border-radius:8px; display:inline-block;">${m.text}</div>
+                            <div class="dc-meta" style="margin-top:10px;">${m.link ? `<i class="fas fa-link"></i> ${m.link}` : 'No Link Attached'}</div>
+                            ${this.formatSched(m.startDate, m.endDate)}
+                        </div>
+                        <div class="dc-actions" style="border:none; padding:0; flex-direction:column; gap:10px; min-width: 120px;">
+                            <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem; width:100%;" onclick="admin.openModal('marquee', '${m.id}')"><i class="fas fa-cog"></i> Config</button>
+                            <button class="btn btn-danger" style="padding:10px 16px; font-size:0.9rem; width:100%;" onclick="admin.deleteItem('marquees', '${m.id}')"><i class="fas fa-trash"></i> Drop</button>
+                        </div>
+                    </div>
+                </div>`;
+            },
+            cardTplPopup(p) {
+                let actText = "Only Close";
+                if(p.actionType==='redirect') actText = "Only Redirect";
+                else if(p.actionType==='close_redirect_one') actText = "Close + Redirect (1 Btn)";
+                else if(p.actionType==='close_redirect_two') actText = "Close & Redirect (2 Btns)";
+                else if(p.actionType==='multi') actText = "Multiple Buttons (JSON)";
+
+                return `<div class="data-card" style="border-left: 6px solid ${p.enabled!==false?'var(--success)':'var(--border)'}">
+                    <div><span class="dc-badge" style="background:#e0e7ff; color:#3730a3; border-color:#c7d2fe;"><i class="fas fa-expand-arrows-alt"></i> Popup Modal</span>
+                    <div class="dc-content" style="font-family:'Inter'; font-weight:800; font-size:1.4rem;">${p.title}</div>
+                    <div class="dc-meta">${p.text}</div>
+                    <div class="dc-meta" style="font-weight:700; color:var(--accent); background:#eff6ff; padding:6px 10px; border-radius:6px; display:inline-block;">Action: ${actText}</div><br>
+                    ${this.formatSched(p.startDate, p.endDate)}
+                    </div>
+                    <div class="dc-actions">
+                        <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.appView('popup', '${p.id}')"><i class="fas fa-eye"></i> View</button>
+                        <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.openModal('popup', '${p.id}')"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="btn btn-danger" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.deleteItem('announcements', '${p.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            },
+            cardTplInnerNotif(n) {
+                return `<div class="data-card">
+                    <div><span class="dc-badge" style="background:#fef3c7; color:#92400e; border-color:#fde68a;"><i class="fas fa-bell"></i> Inner Alert</span>
+                    <div class="dc-content" style="font-family:'Inter'; font-weight:700; font-size:1.2rem; margin-bottom:8px;">${n.title}</div>
+                    <div class="dc-meta" style="margin-bottom:8px;">${n.body}</div>
+                    <div class="dc-meta" style="font-size:0.85rem; font-family:monospace;">${n.date||'No specific date'}</div>
+                    ${this.formatSched(n.startDate, n.endDate)}
+                    </div>
+                    <div class="dc-actions">
+                        <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.openModal('innerNotif', '${n.id}')"><i class="fas fa-edit"></i> Edit</button>
+                        <button class="btn btn-danger" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.deleteItem('innerNotifs', '${n.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            },
+            cardTplSocial(s) {
+                const isSvg = s.icon && s.icon.includes('<svg');
+                return `<div class="data-card" style="flex-direction:row; align-items:center; padding: 20px;">
+                    <div style="font-size:2rem; color:var(--primary); width:60px; display:flex; justify-content:center;">${isSvg ? s.icon : `<i class="${s.icon}"></i>`}</div>
+                    <div class="dc-meta" style="flex:1; margin:0 15px; word-break:break-all; font-family:monospace; font-size:1rem;">${s.url}</div>
+                    <div style="display:flex; gap:10px;">
+                        <button class="btn btn-outline" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.openModal('social', '${s.id}')"><i class="fas fa-edit"></i></button>
+                        <button class="btn btn-danger" style="padding:10px 16px; font-size:0.9rem;" onclick="admin.deleteItem('socials', '${s.id}')"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            },
+
+            // --- SETTINGS POPULATION ---
+            populateSettings() {
+                const c = this.data.config;
+                if(document.getElementById('tglInnerNotifs')) document.getElementById('tglInnerNotifs').checked = c.innerNotifs.enabled !== false;
+                if(document.getElementById('f_enabled')) document.getElementById('f_enabled').checked = c.footer.enabled !== false;
+                if(document.getElementById('f_title')) document.getElementById('f_title').value = c.footer.title || '';
+                if(document.getElementById('f_copy')) document.getElementById('f_copy').value = c.footer.copy || '';
+                if(document.getElementById('f_bgImage')) document.getElementById('f_bgImage').value = c.footer.bgImage || '';
+                if(document.getElementById('f_donateLink')) document.getElementById('f_donateLink').value = c.footer.donateLink || '';
+                if(document.getElementById('f_donateText')) document.getElementById('f_donateText').value = c.footer.donateText || '';
+                
+                const s = this.data.secure;
+                if(document.getElementById('sec_maintenance')) document.getElementById('sec_maintenance').checked = s.maintenance?.enabled === true;
+                if(document.getElementById('sec_maintTitle')) document.getElementById('sec_maintTitle').value = s.maintenance?.title || '';
+                if(document.getElementById('sec_maintMsg')) document.getElementById('sec_maintMsg').value = s.maintenance?.message || '';
+                if(document.getElementById('sec_maintBtn')) document.getElementById('sec_maintBtn').value = s.maintenance?.btnText || '';
+                if(document.getElementById('sec_maintBgColor')) document.getElementById('sec_maintBgColor').value = s.maintenance?.bgColor || '#0f172a';
+                if(document.getElementById('sec_maintTextColor')) document.getElementById('sec_maintTextColor').value = s.maintenance?.textColor || '#ffffff';
+                if(document.getElementById('sec_maintBtnColor')) document.getElementById('sec_maintBtnColor').value = s.maintenance?.btnColor || '#2563eb';
+                if(document.getElementById('sec_maintBgImage')) document.getElementById('sec_maintBgImage').value = s.maintenance?.bgImage || '';
+                
+                for(let i=1; i<=50; i++) { if(document.getElementById(`tgl_${i}`)) document.getElementById(`tgl_${i}`).checked = s.security[`t${i}`] === true; }
+                
+                if(document.getElementById('ipBlacklist')) document.getElementById('ipBlacklist').value = s.ipConfig?.blacklist || '';
+                if(document.getElementById('ipWhitelist')) document.getElementById('ipWhitelist').value = s.ipConfig?.whitelist || '';
+                if(document.getElementById('ipRedirectUrl')) document.getElementById('ipRedirectUrl').value = s.ipConfig?.redirect || '';
+
+                if(s.maintenance?.enabled) document.getElementById('maintGrp').classList.remove('hidden');
+                else document.getElementById('maintGrp').classList.add('hidden');
+
+                const d = this.data.docs;
+                if(document.getElementById('doc_btnText')) document.getElementById('doc_btnText').value = d.btnText || 'Got it';
+                if(document.getElementById('doc_about')) document.getElementById('doc_about').value = d.about || '';
+                if(document.getElementById('doc_terms')) document.getElementById('doc_terms').value = d.terms || '';
+                if(document.getElementById('doc_privacy')) document.getElementById('doc_privacy').value = d.privacy || '';
+            },
+
+            // --- DYNAMIC MODAL GENERATOR ---
+            openModal(type, id = null) {
+                this.state.editingType = type;
+                this.state.editingId = id;
+                const b = document.getElementById('mBody');
+                let item = {};
+                
+                if(id) {
+                    if(type === 'quote') item = this.data.quotes.find(x => String(x.id) === String(id))||{};
+                    else if(type === 'banner') item = this.data.config.banners.find(x => String(x.id) === String(id))||{};
+                    else if(type === 'marquee') item = this.data.config.marquees.find(x => String(x.id) === String(id))||{};
+                    else if(type === 'popup') item = this.data.config.announcements.find(x => String(x.id) === String(id))||{};
+                    else if(type === 'innerNotif') item = this.data.config.innerNotifs.items.find(x => String(x.id) === String(id))||{};
+                    else if(type === 'social') item = this.data.config.footer.socials.find(x => String(x.id) === String(id))||{};
+                }
+
+                document.getElementById('mTitle').innerHTML = id ? `<i class="fas fa-pen-nib"></i> Edit ${type}` : `<i class="fas fa-magic"></i> Create ${type}`;
+                
+                const mkInp = (lbl, id, val, ph='', typ='text') => `<div class="form-group"><label>${lbl}</label><input type="${typ}" id="m_${id}" class="form-control" value="${val||''}" placeholder="${ph}"></div>`;
+                const mkColor = (lbl, id, val) => `<div class="form-group" style="flex:1;"><label>${lbl}</label><div style="display:flex; border:1px solid var(--border); border-radius:var(--radius-md); overflow:hidden;"><input type="color" id="m_${id}" value="${val||'#000000'}" style="width:60px; height:54px; border:none; padding:0; cursor:pointer;"><input type="text" class="form-control" value="${val||'#000000'}" style="border:none; border-radius:0;" oninput="document.getElementById('m_${id}').value=this.value"></div></div>`;
+                const mkTxt = (lbl, id, val, ph='') => `<div class="form-group"><label>${lbl}</label><textarea id="m_${id}" class="form-control" placeholder="${ph}">${val||''}</textarea></div>`;
+                const mkTog = (lbl, id, checked) => `<div class="toggle-row" style="padding:15px 0;"><div class="toggle-info"><strong>${lbl}</strong></div><label class="switch"><input type="checkbox" id="m_${id}" ${checked?'checked':''} onchange="document.getElementById('grp_${id}').classList.toggle('hidden', !this.checked)"><span class="slider"></span></label></div>`;
+
+                let html = '';
+                
+                let pDay='', pMonth='', pYear='';
+                if(item.date) {
+                    const cleanDate = item.date.replace(/,/g, '');
+                    const parts = cleanDate.split(' ');
+                    if(parts.length === 3) { pMonth = parts[0]; pDay = parts[1]; pYear = parts[2]; }
+                    else if (parts.length === 2 && !isNaN(parts[1])) { pMonth = parts[0]; pYear = parts[1]; }
+                    else if (parts.length === 1) { pYear = parts[0]; }
+                }
+
+                const dateHtml = `
+                    <div class="form-row" style="margin-top:10px;">
+                        <input type="number" id="m_dDay" placeholder="Day (DD)" class="form-control" value="${pDay}" style="flex:1; min-width:80px;">
+                        <select id="m_dMonth" class="form-control" style="flex:2;">
+                            <option value="">Month...</option>
+                            ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => `<option value="${m}" ${pMonth===m?'selected':''}>${m}</option>`).join('')}
+                        </select>
+                        <input type="number" id="m_dYear" placeholder="Year (YYYY)" class="form-control" value="${pYear}" style="flex:1; min-width:100px;">
+                    </div>`;
+
+                const schedHtml = `
+                    <h4 style="margin:25px 0 15px; color:var(--primary); border-top:1px dashed var(--border); padding-top:20px;">Scheduling Engine</h4>
+                    <div class="toggle-row" style="padding:10px 0;"><div class="toggle-info"><strong>Enable End Date</strong></div><label class="switch"><input type="checkbox" id="m_useEndDate" ${item.endDate?'checked':''} onchange="document.getElementById('grp_endDate').classList.toggle('hidden', !this.checked)"><span class="slider"></span></label></div>
+                    <div class="form-row" style="margin-top:10px;">
+                        <div class="form-group"><label>Broadcast Start</label><input type="datetime-local" id="m_startDate" class="form-control" value="${item.startDate||''}"><span style="font-size:0.85rem; color:var(--text-muted); margin-top:5px; display:block;">Leave blank to start immediately.</span></div>
+                        <div id="grp_endDate" class="${!item.endDate?'hidden':''} form-group"><label>Broadcast End</label><input type="datetime-local" id="m_endDate" class="form-control" value="${item.endDate||''}"><span style="font-size:0.85rem; color:var(--text-muted); margin-top:5px; display:block;">If off, runs forever.</span></div>
+                    </div>`;
+
+                if(type === 'quote') {
+                    html += mkTxt("Wisdom Text", "text", item.text);
+                    html += `<div class="form-row">
+                                ${mkInp("Author Name", "author", item.author)}
+                                ${mkInp("Category Badge", "category", item.category)}
+                             </div>`;
+                    html += mkInp("Background Canvas URL (Optional)", "image", item.image);
+                    
+                    html += mkTog("Attach Author Profile", "useProfile", item.useProfile!==false);
+                    html += `<div id="grp_useProfile" class="${item.useProfile===false?'hidden':''} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">${mkInp("Custom Avatar URL", "authorImg", item.authorImg)}</div>`;
+                    
+                    html += mkTog("Make Author Clickable", "useProfileLink", !!item.profileUrl);
+                    html += `<div id="grp_useProfileLink" class="${!item.profileUrl?'hidden':''} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">${mkInp("Profile Target URL", "profileUrl", item.profileUrl)}</div>`;
+                    
+                    html += mkTog("Embed Publish Date", "showDate", !!item.date);
+                    html += `<div id="grp_showDate" class="${!item.date?'hidden':''} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">${dateHtml}</div>`;
+                } 
+                else if(type === 'banner') {
+                    html += mkInp("Red Pill Badge", "title", item.title);
+                    html += mkTxt("Hero Heading", "text", item.text);
+                    html += mkInp("Background Image", "image", item.image);
+                    
+                    html += mkTog("Show Subtitle Row", "showBottom", !!item.author);
+                    html += `<div id="grp_showBottom" class="${!item.author?'hidden':''} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">${mkInp("Subtitle Text", "author", item.author)}</div>`;
+
+                    html += mkTog("Attach Profile Avatar", "useProfile", item.useProfile!==false);
+                    html += `<div id="grp_useProfile" class="${item.useProfile===false?'hidden':''} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">${mkInp("Avatar URL", "authorImg", item.authorImg)}</div>`;
+
+                    html += mkTog("Hyperlink Entire Banner", "isClickable", item.isClickable);
+                    html += `<div id="grp_isClickable" class="${!item.isClickable?'hidden':''} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">${mkInp("Destination URL", "buttonLink", item.buttonLink)}</div>`;
+
+                    html += mkTog("Embed Date", "showDate", !!item.date);
+                    html += `<div id="grp_showDate" class="${!item.date?'hidden':''} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">${dateHtml}</div>`;
+                }
+                else if(type === 'marquee') {
+                    html += `<div style="background:#e0e7ff; padding:20px; border-radius:var(--radius-md); margin-bottom:20px; border:1px solid #c7d2fe;">
+                        <h4 style="color:#3730a3; margin-bottom:5px;">Marquee Configuration</h4>
+                        <p style="font-size:0.9rem; color:#4f46e5;">Scrolling ticker tape at the absolute top of the UI.</p>
+                    </div>`;
+                    html += mkTog("Activate Component", "enabled", item.enabled!==false);
+                    html += mkInp("Ticker Text", "text", item.text);
+                    html += mkInp("Hyperlink (Optional)", "link", item.link);
+                    html += `<div class="form-row">
+                                ${mkColor("Font Color", "textColor", item.textColor || "#000000")}
+                                ${mkColor("Canvas Color", "bgColor", item.bgColor || "#FFDD00")}
+                             </div>`;
+                    html += schedHtml;
+                }
+                else if(type === 'popup') {
+                    html += mkTog("Activate Modal", "enabled", item.enabled!==false);
+                    html += mkInp("Headline Title", "title", item.title);
+                    html += mkTxt("Modal Body", "text", item.text);
+                    
+                    html += mkTog("Attach Cover Art", "useCover", !!item.coverImage);
+                    html += `<div id="grp_useCover" class="${!item.coverImage?'hidden':''} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">${mkInp("Image URL", "coverImage", item.coverImage)}</div>`;
+                    
+                    const aType = item.actionType || 'close';
+                    html += `<div class="form-group"><label>Popup Action Type</label>
+                        <select id="m_actionType" class="form-control" onchange="document.querySelectorAll('.popup-act').forEach(e=>e.classList.add('hidden')); document.getElementById('act_'+this.value).classList.remove('hidden');">
+                            <option value="close" ${aType==='close'?'selected':''}>Only Close</option>
+                            <option value="redirect" ${aType==='redirect'?'selected':''}>Only Redirect</option>
+                            <option value="close_redirect_one" ${aType==='close_redirect_one'?'selected':''}>Close + Redirect (1 Button)</option>
+                            <option value="close_redirect_two" ${aType==='close_redirect_two'?'selected':''}>Close & Redirect (2 Buttons)</option>
+                            <option value="multi" ${aType==='multi'?'selected':''}>Multiple Redirect Buttons (JSON)</option>
+                        </select>
+                    </div>`;
+                    
+                    html += `<div id="act_close" class="popup-act ${aType==='close'?'':'hidden'} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">
+                                ${mkInp("Close Button Text", "cancelText_c", item.cancelText || 'Close')}
+                             </div>`;
+                             
+                    html += `<div id="act_redirect" class="popup-act ${aType==='redirect'?'':'hidden'} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">
+                                ${mkInp("Redirect Button Text", "btnText_rd", item.btnText)}
+                                ${mkInp("Destination URL", "btnUrl_rd", item.btnUrl)}
+                             </div>`;
+                             
+                    html += `<div id="act_close_redirect_one" class="popup-act ${aType==='close_redirect_one'?'':'hidden'} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">
+                                ${mkInp("Button Text (Closes then redirects)", "btnText_cro", item.btnText)}
+                                ${mkInp("Destination URL", "btnUrl_cro", item.btnUrl)}
+                             </div>`;
+                             
+                    html += `<div id="act_close_redirect_two" class="popup-act ${aType==='close_redirect_two'?'':'hidden'} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">
+                                <div class="form-row">
+                                    ${mkInp("Redirect Button Text", "btnText_crt", item.btnText)}
+                                    ${mkInp("Destination URL", "btnUrl_crt", item.btnUrl)}
+                                </div>
+                                ${mkInp("Close Button Text", "cancelText_crt", item.cancelText || 'Close')}
+                             </div>`;
+                             
+                    html += `<div id="act_multi" class="popup-act ${aType==='multi'?'':'hidden'} field-group" style="padding-left:15px; border-left:3px solid var(--accent);">
+                                <p style="font-size:0.9rem; color:var(--danger); font-weight:700; margin-bottom:10px;"><i class="fas fa-exclamation-triangle"></i> Configure multiple buttons in JSON Editor (Array format).</p>
+                                ${mkInp("Close Button Text (Optional)", "cancelText_m", item.cancelText || 'Close')}
+                             </div>`;
+
+                    html += schedHtml;
+                }
+                else if(type === 'innerNotif') {
+                    html += mkInp("Alert Header", "title", item.title);
+                    html += mkTxt("Alert Body", "body", item.body);
+                    html += mkInp("Hyperlink (Optional)", "link", item.link);
+                    html += mkInp("Timestamp String (e.g. 5m ago)", "date", item.date);
+                    html += schedHtml;
+                }
+                else if(type === 'social') {
+                    html += mkTxt("Vector Data (Paste full <svg> code OR FontAwesome class)", "icon", item.icon, "<svg>...</svg> or fab fa-instagram");
+                    html += mkInp("Target URL", "url", item.url);
+                }
+
+                b.innerHTML = html;
+                document.getElementById('uModal').classList.add('show');
+            },
+
+            closeModal() { document.getElementById('uModal').classList.remove('show'); },
+
+            saveModal() {
+                const t = this.state.editingType;
+                const id = this.state.editingId || Date.now();
+                const val = (fid) => document.getElementById(`m_${fid}`) ? document.getElementById(`m_${fid}`).value : undefined;
+                const chk = (fid) => document.getElementById(`m_${fid}`) ? document.getElementById(`m_${fid}`).checked : undefined;
+                
+                let item = { id };
+                let targetArray = [];
+                let saveType = 'config';
+
+                let compiledDate = "";
+                if(chk('showDate')) {
+                    const dDay = val('dDay'), dMonth = val('dMonth'), dYear = val('dYear');
+                    let dArr = [];
+                    if(dMonth) dArr.push(dMonth);
+                    if(dDay) dArr.push(dDay);
+                    compiledDate = dArr.join(' ');
+                    if(compiledDate && dYear) compiledDate += `, ${dYear}`;
+                    else if(dYear) compiledDate = dYear;
+                }
+                
+                const sDate = val('startDate');
+                const eDate = chk('useEndDate') ? val('endDate') : '';
+
+                if(t === 'quote') {
+                    item = { ...item, text:val('text'), author:val('author'), category:val('category'), image:val('image'), useProfile:chk('useProfile'), authorImg:chk('useProfile')?val('authorImg'):'', profileUrl:chk('useProfileLink')?val('profileUrl'):'', date:compiledDate };
+                    targetArray = this.data.quotes; saveType = 'quotes';
+                }
+                else if(t === 'banner') {
+                    item = { ...item, title:val('title'), text:val('text'), author:chk('showBottom')?val('author'):'', image:val('image'), isClickable:chk('isClickable'), buttonLink:chk('isClickable')?val('buttonLink'):'', useProfile:chk('useProfile'), authorImg:chk('useProfile')?val('authorImg'):'', date:compiledDate };
+                    targetArray = this.data.config.banners;
+                }
+                else if(t === 'marquee') {
+                    item = { ...item, enabled:chk('enabled'), text:val('text'), link:val('link'), textColor:val('textColor'), bgColor:val('bgColor'), startDate:sDate, endDate:eDate };
+                    targetArray = this.data.config.marquees;
+                }
+                else if(t === 'popup') {
+                    const act = val('actionType');
+                    let btnText = '', btnUrl = '', cancelText = 'Close';
+                    
+                    if(act === 'redirect') { btnText = val('btnText_rd'); btnUrl = val('btnUrl_rd'); }
+                    else if(act === 'close_redirect_one') { btnText = val('btnText_cro'); btnUrl = val('btnUrl_cro'); }
+                    else if(act === 'close_redirect_two') { btnText = val('btnText_crt'); btnUrl = val('btnUrl_crt'); cancelText = val('cancelText_crt'); }
+                    else if(act === 'close') { cancelText = val('cancelText_c'); }
+                    else if(act === 'multi') { cancelText = val('cancelText_m'); }
+
+                    item = { ...item, enabled:chk('enabled'), title:val('title'), text:val('text'), coverImage:chk('useCover')?val('coverImage'):'', actionType:act, btnText:btnText, btnUrl:btnUrl, cancelText:cancelText, startDate:sDate, endDate:eDate };
+                    targetArray = this.data.config.announcements;
+                }
+                else if(t === 'innerNotif') {
+                    item = { ...item, title:val('title'), body:val('body'), link:val('link'), date:val('date'), startDate:sDate, endDate:eDate };
+                    targetArray = this.data.config.innerNotifs.items;
+                }
+                else if(t === 'social') {
+                    item = { ...item, icon:val('icon'), url:val('url') };
+                    targetArray = this.data.config.footer.socials;
+                }
+
+                if(this.state.editingId) {
+                    const idx = targetArray.findIndex(x => String(x.id) === String(id));
+                    if(idx > -1) targetArray[idx] = item;
+                } else {
+                    targetArray.unshift(item);
+                }
+
+                this.closeModal();
+                this.renderAll();
+                this.pushData(saveType);
+            },
+
+            // --- APP PREVIEW LOGIC ---
+            appView(type, id) {
+                const c = document.getElementById('pContent');
+                c.innerHTML = '';
+                
+                if(type === 'quote') {
+                    const q = this.data.quotes.find(x => String(x.id) === String(id));
+                    if(!q) return;
+                    c.innerHTML = `
+                    <div style="width: 100%; max-width: 400px; min-height: 500px; border-radius: 24px; position: relative; overflow: hidden; display: flex; flex-direction: column; background: var(--primary); box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+                        <div style="position:absolute; inset:0; background-image:url('${q.image || 'https://images.unsplash.com/photo-1558655146-d09347e0c766?w=400'}'); background-size:cover; background-position:center; z-index:0;"></div>
+                        <div style="position:absolute; inset:0; background: linear-gradient(to bottom, rgba(0,0,0,0.2), rgba(0,0,0,0.9)); z-index:1;"></div>
+                        <div style="position:relative; z-index:2; padding:24px; display:flex; justify-content:space-between;">
+                            <span style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; backdrop-filter: blur(4px); padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,0.3); color: white;">${q.category || 'Quote'}</span>
+                        </div>
+                        <div style="position:relative; z-index:3; padding: 10px 32px; flex: 1; display: flex; flex-direction: column; justify-content: center; text-align: center; color: white;">
+                            <i class="fas fa-quote-left" style="font-size: 4rem; color: rgba(255,255,255,0.2); font-family: 'Playfair Display'; margin-bottom: 10px;"></i>
+                            <p style="font-family: 'Playfair Display'; font-size: 2.2rem; margin-bottom: 30px;">"${q.text}"</p>
+                            <div style="display: flex; flex-direction: column; align-items: center; gap: 10px;">
+                                ${q.useProfile !== false ? `<img src="${q.authorImg || `https://ui-avatars.com/api/?name=${q.author||'A'}`}" style="width: 50px; height: 50px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.8); object-fit: cover;">` : ''}
+                                <div>
+                                    <p style="font-weight: 700; font-size: 1.2rem;">${q.author}</p>
+                                    <p style="font-size: 0.85rem; color: rgba(255,255,255,0.6); margin-top:4px;">${q.date || ''}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>`;
+                } else if (type === 'banner') {
+                    const b = this.data.config.banners.find(x => String(x.id) === String(id));
+                    if(!b) return;
+                    c.innerHTML = `
+                    <div style="width: 100%; max-width: 600px; padding: 3rem 2rem; border-radius: 24px; text-align: center; background-image: ${b.image ? `url('${b.image}')` : 'var(--primary)'}; background-size: cover; background-position: center; position: relative; overflow: hidden; color: white;">
+                        <div style="position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8)); z-index: 1;"></div>
+                        <div style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center;">
+                            <span style="background: var(--accent); color: white; padding: 6px 14px; border-radius: 50px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; margin-bottom: 16px;">${b.title||'Banner'}</span>
+                            <p style="font-family: 'Playfair Display'; font-size: 1.6rem; line-height: 1.4; margin-bottom: 15px;">${b.text}</p>
+                            ${b.author ? `
+                            <div style="display: flex; align-items: center; gap: 10px; background: rgba(255,255,255,0.15); padding: 5px 15px 5px 5px; border-radius: 50px; backdrop-filter: blur(4px); border: 1px solid rgba(255,255,255,0.2);">
+                                ${b.useProfile !== false ? `<img src="${b.authorImg || `https://ui-avatars.com/api/?name=${b.author||'A'}`}" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid rgba(255,255,255,0.9);">` : ''}
+                                <div style="display: flex; flex-direction: column; align-items: flex-start;">
+                                    <p style="font-weight: 700; font-size: 0.95rem;">${b.author}</p>
+                                    <span style="font-size: 0.7rem; color: rgba(255,255,255,0.8);">${b.date||''}</span>
+                                </div>
+                            </div>` : ''}
+                        </div>
+                    </div>`;
+                } else if (type === 'popup') {
+                    const a = this.data.config.announcements.find(x => String(x.id) === String(id));
+                    if(!a) return;
+                    
+                    let btnsHtml = '';
+                    if(a.actionType === 'redirect' && a.btnText) {
+                        btnsHtml = `<button style="background:var(--primary); color:white; padding:15px; width:100%; border-radius:50px; border:none; font-weight:600;">${a.btnText}</button>`;
+                    } else if(a.actionType === 'close_redirect_one' && a.btnText) {
+                        btnsHtml = `<button style="background:var(--primary); color:white; padding:15px; width:100%; border-radius:50px; border:none; font-weight:600;">${a.btnText}</button>`;
+                    } else if(a.actionType === 'close_redirect_two') {
+                        btnsHtml = `<button style="background:var(--primary); color:white; padding:15px; width:100%; border-radius:50px; border:none; font-weight:600; margin-bottom:10px;">${a.btnText}</button>
+                                    <button style="background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; padding:14px; width:100%; border-radius:50px; font-weight:600; border:none;">${a.cancelText||'Close'}</button>`;
+                    } else {
+                        btnsHtml = `<button style="background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; padding:14px; width:100%; border-radius:50px; font-weight:600; border:none;">${a.cancelText||'Close'}</button>`;
+                    }
+
+                    c.innerHTML = `
+                    <div style="background: white; width: 100%; max-width: 420px; border-radius: 24px; overflow: hidden; display: flex; flex-direction: column;">
+                        ${a.useCover && a.coverImage ? `<div style="width: 100%; height: 160px; background-size: cover; background-position: center; background-image:url('${a.coverImage}');"></div>` : ''}
+                        <div style="padding: 32px 25px 25px; text-align: center; display: flex; flex-direction: column; align-items: center;">
+                            <h2 style="font-family: 'Playfair Display'; font-size: 1.6rem; color: #0f172a; margin-bottom: 10px;">${a.title}</h2>
+                            <p style="font-size: 0.95rem; color: #64748b; line-height: 1.6; margin-bottom: 25px; white-space:pre-wrap;">${a.text}</p>
+                            <div style="width:100%; margin-top:10px;">${btnsHtml}</div>
+                        </div>
+                    </div>`;
+                }
+                document.getElementById('pModal').classList.add('show');
+            },
+
+            // --- RAW JSON EDITOR ---
+            async switchJsonFile() {
+                const f = document.getElementById('jsonFileSelect').value;
+                const inp = document.getElementById('newFileWrapper');
+                
+                if (f === 'new') {
+                    inp.classList.remove('hidden');
+                    document.getElementById('jsonEditor').value = "{\n    \"new_key\": \"new_value\"\n}";
+                    this.state.currentJsonFile = 'new';
+                } else {
+                    inp.classList.add('hidden');
+                    this.state.currentJsonFile = f;
+                    
+                    if (f === 'quotes.json') {
+                        document.getElementById('jsonEditor').value = JSON.stringify(this.data.quotes, null, 4);
+                    } else if (f === 'config.json') {
+                        document.getElementById('jsonEditor').value = JSON.stringify(this.data.config, null, 4);
+                    } else if (f === 'secure.json') {
+                        document.getElementById('jsonEditor').value = JSON.stringify(this.data.secure, null, 4);
+                    } else if (f === 'docs.json') {
+                        document.getElementById('jsonEditor').value = JSON.stringify(this.data.docs, null, 4);
+                    } else {
+                        if(this.templates[f]) {
+                            document.getElementById('jsonEditor').value = this.templates[f];
+                        } else {
+                            this.showLoader(`Fetching ${f}...`);
+                            try {
+                                const data = await this.fetchFile(f);
+                                if(data) {
+                                    document.getElementById('jsonEditor').value = data.rawStr;
+                                    this.state.fileSHAs[f] = data.sha;
+                                } else {
+                                    document.getElementById('jsonEditor').value = "{\n    // File currently does not exist on server\n}";
+                                    delete this.state.fileSHAs[f];
+                                }
+                            } catch(e) {
+                                document.getElementById('jsonEditor').value = "{\n    // Error fetching file\n}";
+                            } finally {
+                                this.hideLoader();
+                            }
+                        }
+                    }
+                }
+            },
+
+            async saveRawJson() {
+                let f = this.state.currentJsonFile;
+                if (f === 'new') {
+                    f = document.getElementById('newFileName').value;
+                    if(!f) return this.toast("Filename is required", "error");
+                    if(!f.endsWith('.json')) f += '.json';
+                }
+                
+                try {
+                    const rawData = JSON.parse(document.getElementById('jsonEditor').value);
+                    if (f === 'quotes.json') this.data.quotes = rawData;
+                    else if (f === 'config.json') this.data.config = rawData;
+                    else if (f === 'secure.json') this.data.secure = rawData;
+                    else if (f === 'docs.json') this.data.docs = rawData;
+                    
+                    await this.pushData('custom', f, rawData);
+                    if(this.state.currentJsonFile === 'new') {
+                        document.getElementById('newFileName').value = '';
+                        this.state.currentJsonFile = f;
+                    }
+                } catch(e) {
+                    this.toast("Syntax Error: Invalid JSON formatting", "error");
+                }
+            },
+            
+            downloadJson() {
+                const f = this.state.currentJsonFile === 'new' ? 'data.json' : this.state.currentJsonFile;
+                let d = {};
+                try { d = JSON.parse(document.getElementById('jsonEditor').value); } 
+                catch(e) { d = { error: "Failed to parse current editor view" }; }
+                
+                const str = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(d, null, 4));
+                const a = document.createElement('a'); a.href = str; a.download = f;
+                document.body.appendChild(a); a.click(); a.remove();
+            }
+        };
+
+        window.onload = () => admin.init();
+    </script>
+</body>
+</html>

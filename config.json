@@ -1,0 +1,29 @@
+{
+    "banners": [],
+    "announcements": [],
+    "marquees": [],
+    "innerNotifs": {
+        "enabled": true,
+        "items": []
+    },
+    "footer": {
+        "enabled": true,
+        "title": "QuoteVerse",
+        "copy": "© 2026 QuoteVerse | Shyam Kumar Bodhak",
+        "bgImage": "",
+        "donateLink": "https://buymeacoffee.com/SKBodhak",
+        "donateText": "Buy me a coffee",
+        "socials": [
+            {
+                "id": "1700000000001",
+                "icon": "fab fa-instagram",
+                "url": "https://instagram.com/SKBodhak"
+            },
+            {
+                "id": "1700000000002",
+                "icon": "fab fa-github",
+                "url": "https://github.com/SKBodhak"
+            }
+        ]
+    }
+}

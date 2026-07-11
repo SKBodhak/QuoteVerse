@@ -1,0 +1,25 @@
+{
+    "maintenance": {
+        "enabled": false,
+        "title": "Under Maintenance",
+        "message": "We'll be right back.",
+        "btnText": "Refresh Page",
+        "bgColor": "#0f172a",
+        "textColor": "#ffffff",
+        "btnColor": "#2563eb",
+        "bgImage": ""
+    },
+    "security": {
+        "t9": false,
+        "t11": false,
+        "t12": false,
+        "t18": false,
+        "t20": false,
+        "t25": false
+    },
+    "ipConfig": {
+        "blacklist": "",
+        "whitelist": "",
+        "redirect": ""
+    }
+}
